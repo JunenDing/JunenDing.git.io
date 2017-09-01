@@ -1,0 +1,297 @@
+---
+title: "CRAN Download Monitor"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(flexdashboard)
+library(shiny)
+library(rmarkdown)
+```
+
+```{r global, include=FALSE}
+sp <- read.csv("C:/Users/bbbbbbbbbbbb/Documents/appweb_test/sp_test.csv",header = TRUE,sep=",",encoding = 'big5')
+sp <- na.omit(sp) 
+sp <- sp[,-1]
+```
+
+
+
+Sidebar {.sidebar}
+=======================================================================
+
+```{r}
+selectInput('xcol', '監測站點', names(sp),choices = colnames(sp[,c(2:30)]))
+```
+
+```{r}
+selectInput('tt', 'Time', names(sp),choices = sp$date)
+
+bb1 <- reactive({
+xvar <-sp[sp$date == input$tt,input$xcol]
+  })
+
+```
+
+```{r}
+selectInput('t1', '氣候選項', names(sp),choices = colnames(sp[,c(2:3)]))
+
+bb2 <- reactive({
+xvar <-sp[sp$date == input$tt,input$t1]
+  })
+```
+
+
+欄位2 {.tabset}
+-------------------------------------
+
+### 數值壓力表
+
+
+-------------------------------------
+
+Home
+=======================================================================
+
+
+Row 
+-----------------------------------------------------------------------
+
+### Date {.value-box}
+```{r}
+
+today <- Sys.Date()
+
+renderValueBox({
+  valueBox(today, icon = "fa-calendar-o")
+})
+
+```
+
+### Total commit {.value-box}
+
+```{r}
+tta <- seq(10)
+renderValueBox({
+  valueBox(tta, icon = "fa-comments",color = "orange")
+})
+```
+
+### PM2.5 value {.value-box}
+
+```{r}
+
+renderValueBox({
+  valueBox(bb1(), icon = "fa fa-industry",color = "green")
+})
+
+```
+
+
+Row
+-----------------------------------------------------------------------
+
+### PM10
+
+```{r}
+gg <- seq(10)
+gauge(gg,min = 1,symbol = '%',max=10,gaugeSectors(success = c(1,6),warning = c(8,9),danger = c(9,10)))
+```
+
+
+### 風向、風速 
+
+
+```{r}
+renderGauge({
+  
+
+gauge(bb2(),min = 1,max=400,gaugeSectors(success = c(1,100),warning = c(101,200),danger = c(201,300)))
+})
+```
+
+
+### PM2.5 
+
+
+```{r}
+renderGauge({
+  
+
+gauge(bb1(),min = 1,max=100,gaugeSectors(success = c(1,20),warning = c(20,40),danger = c(40,60)))
+})
+```
+
+
+Column  {.tabset } {data-width=700}
+-----------------------------------------------------------------------
+
+
+### Map {data-width=700}
+
+```{r}
+library(leaflet)
+
+leaflet() %>%
+  addTiles() %>%
+  addMarkers(lng=120.951262, lat=23.978271, popup="The birthplace of R") 
+
+
+```
+
+
+### 即時數值排名 {.tabset .tabset-fade data-width=300 }
+```{r}
+renderTable(sp)
+```
+
+PM2.5監測點即時值 
+======================================================================
+
+```{r}
+library(DT)
+
+datatable(head(sp, 20), options = list(
+  initComplete = JS(
+    "function(settings, json) {",
+    "$(this.api().table().header()).css({'background-color': '#000', 'color': '#fff'});",
+    "}")
+))
+```
+
+時間序列圖
+======================================================================
+
+```{r echo = FALSE}
+library(ggplot2)
+library(plotly)
+library(forecast)
+sp$date <- as.POSIXct(sp$date)
+pp <- ts(sp[,c(2:30)])
+ww <- reactive({
+pp[,input$xcol]
+
+})
+
+renderPlotly({
+  fc <- forecast(ww(),h=10)
+zz <- autoplot(fc)
+ggplotly(zz)
+})
+```
+
+
+
+即時資料
+=======================================================================
+
+
+```{r}
+
+selectInput('tt5', 'Time', names(sp),choices = sp$date)
+selectInput('gg', '監測站點', names(sp),choices = colnames(sp[,c(2:30)]))
+
+
+bb <- reactive({
+xvar <-sp[sp$date == input$tt5,input$gg]
+  })
+
+renderTable({
+ c(bb(),input$tt5)
+})
+
+
+
+```
+
+### PM2.5
+
+```{r}
+
+renderGauge({
+  
+
+gauge(bb(),min = 1,max=100,gaugeSectors(success = c(1,20),warning = c(20,40),danger = c(40,60)))
+})
+```
+
+### PM2.5 value {.value-box}
+```{r}
+renderValueBox({
+  valueBox(bb(), icon = "fa fa-industry",color = "green")
+})
+```
+
+SQL測試頁
+==========================================================
+
+
+測試頁
+=========================================
+### Inline Shiny App via shinyApp
+
+```{r}
+
+
+```
+
+測試頁1
+=========================================
+
+```{r}
+shinyApp(
+  ui = fillPage(
+    fillCol(flex = c(NA, 1), 
+      inputPanel(
+        selectInput("region", "監測站", choices = colnames(sp[,c(2:30)]))
+      ),
+      plotOutput("kk")
+    )
+  ),
+  server = function(input, output) {
+    output$kk <- renderPlot({
+      plot.ts(sp[,input$region], 
+              ylab = "PM2.5", xlab = "Time")
+    })
+  },
+  options = list(height = 600)
+)
+```
+
+時間測試頁
+=========================================
+
+
+```{r}
+
+selectedData <- reactive({
+  sp[,c(input$xcol)]
+ 
+})
+
+
+renderPlot({
+ plot.ts(selectedData(), ylab = "PM2.5", xlab = "Time")
+  
+})
+
+```
+
+汙染測試頁
+========================================
+
+```{r}
+
+
+library(openair)
+renderPlot({
+  polarPlot(sp,pollutant = input$xcol)
+})
+
+
+```
+
